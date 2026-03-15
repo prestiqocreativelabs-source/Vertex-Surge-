@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vertex Surge — Google Maps to Excel</title>
+  <meta name="description" content="Click on the map to pick a location, search nearby places and export to Excel. Powered by OpenStreetMap + Supabase." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ── HEADER ─────────────────────────────────────────────── -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon">🗺️</span>
+        <span class="logo-text">Vertex <span class="logo-pro">Surge</span></span>
+      </div>
+      <div class="header-tabs">
+        <button class="nav-tab active" data-tab="searchTab">🔍 Search & Map</button>
+        <button class="nav-tab" data-tab="dbTab">☁️ Saved Database</button>
+      </div>
+      <button class="btn-settings" id="settingsBtn" title="Supabase Settings">⚙️ Settings</button>
+    </div>
+  </header>
+
+  <!-- ── SETTINGS MODAL ──────────────────────────────────────── -->
+  <div class="modal-overlay" id="settingsModal" style="display:none">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>⚙️ Supabase Settings</h3>
+        <button class="btn-icon modal-close" id="closeSettings">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="input-group">
+          <label>Supabase Project URL</label>
+          <input type="text" id="sbUrl" placeholder="https://xxxx.supabase.co" />
+        </div>
+        <div class="input-group">
+          <label>Anon Key</label>
+          <input type="text" id="sbKey" placeholder="eyJ…" />
+        </div>
+        <div class="db-status" id="dbStatus"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-primary" id="saveSettingsBtn">💾 Save & Connect</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── APP TABS ─────────────────────────────────────────────── -->
+  <div class="tab-content active" id="searchTab">
+    
+    <!-- ── MAIN LAYOUT ──────────────────────────────────────────── -->
+    <div class="app-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+      <!-- Location picker -->
+      <div class="sidebar-card">
+        <h2 class="section-title">📍 Select Location</h2>
+        <p class="map-hint">Search a place or click directly on the map to drop a pin.</p>
+        <div class="geocoder-row">
+          <input type="text" id="geocoderInput" placeholder="Search city, area, landmark…" />
+          <button id="geocoderBtn" class="btn-geo" title="Find location">🔎</button>
+        </div>
+        <div id="pickerMap"></div>
+        <div class="coords-row" id="coordsRow" style="display:none">
+          <span class="coords-icon">📌</span>
+          <span id="coordsText" class="coords-text">—</span>
+          <button id="clearPinBtn" class="btn-icon" title="Clear pin">✕</button>
+        </div>
+        <div class="coords-row coords-hint-row" id="coordsHint">
+          <span class="coords-hint">No location selected yet</span>
+        </div>
+      </div>
+
+      <!-- Search -->
+      <div class="sidebar-card">
+        <h2 class="section-title">🔍 Search</h2>
+        <div class="preset-grid" id="presetGrid">
+          <button class="preset-btn" data-cat="restaurant">🍽️ Restaurants</button>
+          <button class="preset-btn" data-cat="cafe">☕ Cafés</button>
+          <button class="preset-btn" data-cat="hotel">🏨 Hotels</button>
+          <button class="preset-btn" data-cat="hospital">🏥 Hospitals</button>
+          <button class="preset-btn" data-cat="pharmacy">💊 Pharmacies</button>
+          <button class="preset-btn" data-cat="school">🎓 Schools</button>
+          <button class="preset-btn" data-cat="bank">🏦 Banks</button>
+          <button class="preset-btn" data-cat="gym">💪 Gyms</button>
+          <button class="preset-btn" data-cat="supermarket">🛒 Supermarkets</button>
+          <button class="preset-btn" data-cat="beauty_salon">💅 Salons</button>
+        </div>
+        <div class="input-group">
+          <label for="categoryInput">Category / Business Type</label>
+          <input type="text" id="categoryInput" placeholder="e.g. restaurant, clinic, gym…" />
+        </div>
+        <div class="input-group">
+          <label for="radiusInput">Search Radius — <span id="radiusLabel" class="range-inline-val">50 km</span></label>
+          <input type="range" id="radiusInput" min="1" max="500" value="50" />
+        </div>
+        <button class="btn-primary" id="searchBtn">
+          <span id="searchBtnIcon">🔍</span>
+          <span id="searchBtnText">Search Places</span>
+        </button>
+        <div class="loading-bar" id="loadingBar">
+          <div class="loading-fill" id="loadingFill"></div>
+        </div>
+        <p class="search-status" id="searchStatus"></p>
+      </div>
+
+      <!-- Save to DB (shown after results load) -->
+      <div class="sidebar-card" id="saveCard" style="display:none">
+        <h2 class="section-title">💾 Save to Database</h2>
+        <p class="map-hint">Give this search a name. Re-saving the same name updates existing data and removes duplicates.</p>
+        <div class="input-group">
+          <label for="searchNameInput">Search Name</label>
+          <input type="text" id="searchNameInput" placeholder="e.g. Mumbai Restaurants" />
+        </div>
+        <button class="btn-save-db" id="saveDbBtn">☁️ Save to Supabase</button>
+        <p class="save-status" id="saveStatus"></p>
+      </div>
+
+      <!-- Saved Searches -->
+      <div class="sidebar-card" id="savedCard">
+        <h2 class="section-title">📂 Saved Searches</h2>
+        <div id="savedList">
+          <p class="coords-hint" style="text-align:center;padding:8px 0">Connect Supabase to see saved searches</p>
+        </div>
+      </div>
+
+      <!-- Column selector -->
+      <div class="sidebar-card" id="columnCard" style="display:none">
+        <h2 class="section-title">📋 Export Columns</h2>
+        <div class="col-checks" id="columnChecks"></div>
+      </div>
+
+      <!-- Export -->
+      <div class="sidebar-card" id="exportCard" style="display:none">
+        <h2 class="section-title">📥 Export</h2>
+        <p class="export-hint">
+          <span id="selectedCount">0</span> of <span id="totalCount">0</span> rows selected
+        </p>
+        <button class="btn-export" id="exportBtn">⬇️ Export to Excel</button>
+        <button class="btn-secondary" id="selectAllBtn">☑️ Select All</button>
+        <button class="btn-secondary" id="clearSelBtn">⬜ Clear Selection</button>
+      </div>
+    </aside>
+
+    <!-- RESULTS AREA -->
+    <main class="results-area">
+      <div class="filter-bar" id="filterBar" style="display:none">
+        <span class="filter-label">Filter by Website:</span>
+        <div class="filter-pills">
+          <button class="pill active" id="filterAll">All</button>
+          <button class="pill pill-green" id="filterHas">✅ Has Website</button>
+          <button class="pill pill-red" id="filterNo">❌ No Website</button>
+        </div>
+        <span class="result-count" id="resultCount"></span>
+      </div>
+      <div class="table-wrap" id="tableWrap" style="display:none">
+        <table id="resultsTable">
+          <thead id="tableHead"></thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">👆</div>
+        <h3>Click the map to pick a location</h3>
+        <p>Then choose a category and hit Search Places.</p>
+      </div>
+      <!-- No results -->
+      <div class="no-results" id="noResults" style="display:none">
+        <div class="empty-icon">😔</div>
+        <h3>No results found</h3>
+        <p>Try a different category or pick a different location.</p>
+      </div>
+    </main>
+    </div>
+  </div> <!-- /searchTab -->
+
+  <!-- ── DATABASE TAB ─────────────────────────────────────────── -->
+  <div class="tab-content" id="dbTab" style="display:none">
+    <div class="app-layout">
+      <!-- Sidebar for lists -->
+      <aside class="sidebar">
+        <div class="sidebar-card" id="savedCardDb">
+          <h2 class="section-title">📂 Your Saved Searches</h2>
+          <p class="map-hint" style="margin-bottom:8px">Click a saved search to view all places in the database.</p>
+          <div id="dbSavedList">
+            <p class="coords-hint" style="text-align:center;padding:8px 0">Connect Supabase to see saved searches</p>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main viewing area -->
+      <main class="results-area">
+        <div class="filter-bar" id="dbFilterBar" style="display:none; justify-content:space-between;">
+          <h3 id="dbViewTitle" style="font-size:1.1rem;font-weight:600;margin:0;">—</h3>
+          <div style="display:flex;gap:10px;">
+            <button class="btn-export" id="dbExportBtn" style="padding:8px 14px;font-size:0.8rem;">⬇️ Export View to Excel</button>
+            <button class="btn-del" id="dbDeleteBtn" style="padding:8px 14px;font-size:0.8rem;border:1px solid rgba(239,68,68,0.4)">🗑️ Delete permanently</button>
+          </div>
+        </div>
+        
+        <div class="table-wrap" id="dbTableWrap" style="display:none">
+          <table id="dbResultsTable">
+            <thead id="dbTableHead"></thead>
+            <tbody id="dbTableBody"></tbody>
+          </table>
+        </div>
+
+        <div class="empty-state" id="dbEmptyState">
+          <div class="empty-icon">☁️</div>
+          <h3>Supabase Database View</h3>
+          <p>Select a search from the left to view all saved records.</p>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- Leaflet -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- SheetJS -->
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
