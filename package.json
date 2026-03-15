@@ -1,20 +1,22 @@
 {
-  "name": "maps",
-  "version": "1.0.0",
-  "description": "",
-  "main": "app.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/prestiqocreativelabs-source/Vertex-Surge-.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/prestiqocreativelabs-source/Vertex-Surge-/issues"
-  },
-  "homepage": "https://github.com/prestiqocreativelabs-source/Vertex-Surge-#readme"
+"name": "maps",
+"version": "1.0.0",
+"description": "Vertex Surge project",
+"main": "app.js",
+"scripts": {
+"build": "echo Build successful",
+"start": "node app.js",
+"test": "echo "No tests specified""
+},
+"repository": {
+"type": "git",
+"url": "https://github.com/prestiqocreativelabs-source/Vertex-Surge-.git"
+},
+"keywords": [],
+"author": "",
+"license": "ISC",
+"bugs": {
+"url": "https://github.com/prestiqocreativelabs-source/Vertex-Surge-/issues"
+},
+"homepage": "https://github.com/prestiqocreativelabs-source/Vertex-Surge-#readme"
 }
